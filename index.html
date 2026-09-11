@@ -201,13 +201,106 @@ function inicializarGraficos(){
   crearChart("chEmpresa","doughnut", "Viajes", {responsive:true, maintainAspectRatio:false});
 }
 
-function acum(arr, key){ return Object.entries(arr.reduce((a,r)=>{(a[r[key] ?? "(sin dato)"] = (a[r[key] ?? "(sin dato)"]||0)+1); return a;},{})).sort((a,b)=>b[1]-a[1]); }
+function normalizarFila(r, idx){
+  if(!r || typeof r !== "object") return r;
+
+  // 1. Normalizar Item (entero correlativo)
+  if(r.item !== null && r.item !== undefined && String(r.item).trim() !== ""){
+    const numIt = parseInt(r.item, 10);
+    r.item = isNaN(numIt) ? (idx + 1) : numIt;
+  } else {
+    r.item = idx + 1;
+  }
+
+  // 2. Normalizar Fecha a formato estandar ISO YYYY-MM-DD
+  if(r.fecha){
+    let f = String(r.fecha).trim();
+    if(f.includes("/")){
+      const p = f.split("/");
+      if(p.length === 3){
+        if(p[2].length === 4){
+          // DD/MM/YYYY
+          f = `${p[2]}-${p[1].padStart(2, "0")}-${p[0].padStart(2, "0")}`;
+        } else if(p[0].length === 4){
+          // YYYY/MM/DD
+          f = `${p[0]}-${p[1].padStart(2, "0")}-${p[2].padStart(2, "0")}`;
+        }
+      }
+    }
+    r.fecha = f;
+  } else {
+    r.fecha = null;
+  }
+
+  // 3. Normalizar Strings y recortar espacios
+  ["turno", "empresa", "placa", "origen", "destino", "observacion"].forEach(k => {
+    if(r[k] !== null && r[k] !== undefined){
+      let s = String(r[k]).trim();
+      if(s === "" || s.toLowerCase() === "null") r[k] = null;
+      else r[k] = s;
+    } else {
+      r[k] = null;
+    }
+  });
+
+  if(r.turno) r.turno = r.turno.toUpperCase();
+
+  // Si es Stand-By sin placa registrada
+  if(!r.placa && r.empresa && r.empresa.toUpperCase().includes("STAND-BY")){
+    r.placa = "STAND-BY";
+  }
+
+  // 4. Normalizar Horas (HH:MM)
+  ["inicio_carguio", "fin_carguio", "inicio_descarga", "fin_descarga", "hora_regreso", "hora_llegada"].forEach(k => {
+    if(r[k] !== null && r[k] !== undefined){
+      let h = String(r[k]).trim();
+      if(h === "" || h.toLowerCase() === "null") r[k] = null;
+      else r[k] = h;
+    } else {
+      r[k] = null;
+    }
+  });
+
+  // 5. Normalizar Valores Numericos y Metricas de Tiempo
+  ["tonelaje", "entre_tiempo_carguio", "tiempo_carguio", "tiempo_descarga", "tiempo_ciclo"].forEach(k => {
+    if(r[k] !== null && r[k] !== undefined && r[k] !== ""){
+      const val = parseFloat(String(r[k]).replace(",", "."));
+      r[k] = isNaN(val) ? null : val;
+    } else {
+      r[k] = null;
+    }
+  });
+
+  return r;
+}
+
+function acum(arr, key){
+  return Object.entries(arr.reduce((a,r)=>{
+    const val = r[key];
+    const k = (val !== null && val !== undefined && String(val).trim() !== "") ? String(val).trim() : "(sin dato)";
+    a[k] = (a[k]||0)+1;
+    return a;
+  },{})).sort((a,b)=>b[1]-a[1]);
+}
+
 function acumProm(arr, key, valKey){
   const m = {};
-  arr.forEach(r=>{ const k = r[key] ?? "(sin dato)"; (m[k] = m[k] || []).push(r[valKey]); });
+  arr.forEach(r=>{
+    const val = r[key];
+    const k = (val !== null && val !== undefined && String(val).trim() !== "") ? String(val).trim() : "(sin dato)";
+    (m[k] = m[k] || []).push(r[valKey]);
+  });
   return Object.entries(m).map(([k,v])=>[k, v.filter(Number.isFinite).reduce((s,x)=>s+x,0)/ (v.filter(Number.isFinite).length||1)]).sort((a,b)=>b[1]-a[1]);
 }
-function mapSuma(arr, key){ return Object.entries(arr.reduce((a,r)=>{const k=r[key]??"(sin dato)"; a[k]=(a[k]||0)+(Number(r.tonelaje)||0); return a;},{})).sort((a,b)=>b[1]-a[1]); }
+
+function mapSuma(arr, key){
+  return Object.entries(arr.reduce((a,r)=>{
+    const val = r[key];
+    const k = (val !== null && val !== undefined && String(val).trim() !== "") ? String(val).trim() : "(sin dato)";
+    a[k] = (a[k]||0) + (Number(r.tonelaje)||0);
+    return a;
+  },{})).sort((a,b)=>b[1]-a[1]);
+}
 
 const normS = s => (s||"").trim().toUpperCase().replace(/[ÁÉÍÓÚÀÉÍÓÚ]+/g, m=>({"Á":"A","É":"E","Í":"I","Ó":"O","Ú":"U","À":"A","È":"E","Ì":"I","Ò":"O","Ù":"U"})[m]||m);
 
@@ -227,10 +320,10 @@ function aplicarFiltros(desdeBusqueda){
     if(f.desde && (r.fecha && r.fecha < f.desde)) return false;
     if(f.hasta && (r.fecha && r.fecha > f.hasta)) return false;
     if(f.turno && normS(r.turno) !== f.turno) return false;
-    if(f.placa && r.placa !== f.placa) return false;
-    if(f.empresa && r.empresa !== f.empresa) return false;
-    if(f.origen && r.origen !== f.origen) return false;
-    if(f.destino && r.destino !== f.destino) return false;
+    if(f.placa && (r.placa || "") !== f.placa) return false;
+    if(f.empresa && (r.empresa || "") !== f.empresa) return false;
+    if(f.origen && (r.origen || "") !== f.origen) return false;
+    if(f.destino && (r.destino || "") !== f.destino) return false;
     if(f.busqueda){
       const hay = CAMPOS.some(c => String(r[c.k] ?? "").toLowerCase().includes(f.busqueda));
       if(!hay) return false;
@@ -367,11 +460,11 @@ function renderTabla(){
 function irPag(p){ pagina=p; renderTabla(); el("tbl").parentElement.scrollTop = 0; }
 
 function poblarSelects(){
-  const vals = (key) => [...new Set(DATA.filas.map(r=>r[key]).filter(Boolean))].sort();
-  el("fPlaca").innerHTML = `<option value="">Todas</option>` + vals("placa").map(v=>`<option>${v}</option>`).join("");
-  el("fEmpresa").innerHTML = `<option value="">Todas</option>` + vals("empresa").map(v=>`<option>${v}</option>`).join("");
-  el("fOrigen").innerHTML = `<option value="">Todos</option>` + vals("origen").map(v=>`<option>${v}</option>`).join("");
-  el("fDestino").innerHTML = `<option value="">Todos</option>` + vals("destino").map(v=>`<option>${v}</option>`).join("");
+  const vals = (key) => [...new Set(DATA.filas.map(r=>r[key]).filter(v => v !== null && v !== undefined && String(v).trim() !== ""))].sort();
+  el("fPlaca").innerHTML = `<option value="">Todas</option>` + vals("placa").map(v=>`<option value="${v}">${v}</option>`).join("");
+  el("fEmpresa").innerHTML = `<option value="">Todas</option>` + vals("empresa").map(v=>`<option value="${v}">${v}</option>`).join("");
+  el("fOrigen").innerHTML = `<option value="">Todos</option>` + vals("origen").map(v=>`<option value="${v}">${v}</option>`).join("");
+  el("fDestino").innerHTML = `<option value="">Todos</option>` + vals("destino").map(v=>`<option value="${v}">${v}</option>`).join("");
 }
 
 function limpiarFiltros(){
@@ -386,6 +479,10 @@ async function cargarDatos(){
     const res = await fetch("data.json", {cache:"no-store"});
     if(!res.ok) throw new Error("HTTP "+res.status);
     DATA = await res.json();
+    if(Array.isArray(DATA.filas)){
+      DATA.filas = DATA.filas.map((r, i) => normalizarFila(r, i));
+      DATA.total_filas = DATA.filas.length;
+    }
     box.style.display = "none";
     el("metaUpdate").textContent = `Última actualización: ${pintarFecha(DATA.generado? DATA.generado.slice(0,10): null)} · ${DATA.total_filas} viajes exportados`;
     poblarSelects();
