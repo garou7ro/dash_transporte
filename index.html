@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Transporte · Relave</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
+    --primary:#2563eb; --primary-dark:#1d4ed8; --accent:#f59e0b; --night:#7c3aed;
+    --green:#059669; --red:#dc2626; --radius:12px; --shadow:0 1px 3px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, -apple-system, Arial, sans-serif; font-size:14px}
+  header.topbar{background:linear-gradient(120deg,#0f172a,#1e3a8a); color:#fff; padding:16px 24px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between}
+  header.topbar h1{font-size:20px; font-weight:700; display:flex; align-items:center; gap:10px}
+  header.topbar .meta{font-size:12px; opacity:.85}
+  .wrap{max-width:1400px; margin:0 auto; padding:20px 24px}
+  .filters{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px}
+  .filters label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:4px; font-weight:600}
+  .filters input,.filters select{width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-size:14px; background:#fff; color:var(--text)}
+  .filters input:focus,.filters select:focus{outline:2px solid var(--primary); outline-offset:0; border-color:transparent}
+  .btn{border:none; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer; transition:filter .15s}
+  .btn-primary{background:var(--primary); color:#fff}
+  .btn-primary:hover{background:var(--primary-dark)}
+  .btn-ghost{background:transparent; border:1px solid var(--border); color:var(--text)}
+  .btn-ghost:hover{background:var(--bg)}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px}
+  .kpi{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px}
+  .kpi .lbl{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:600}
+  .kpi .val{font-size:26px; font-weight:800; margin-top:4px; font-variant-numeric:tabular-nums}
+  .kpi .sub{font-size:12px; color:var(--muted); margin-top:2px}
+  .kpi .val.min{color:var(--red)} .kpi .val.med{color:var(--accent)} .kpi .val.ok{color:var(--green)}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:14px; margin-bottom:20px}
+  .panel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px}
+  .panel h2{font-size:14px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between}
+  .panel h2 .hint{font-size:11px; font-weight:400; color:var(--muted)}
+  .chartbox{position:relative; height:300px}
+  .tablepanel{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:20px; overflow:hidden}
+  .table-head{display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px}
+  .table-head h2{font-size:14px; font-weight:700}
+  .table-head input[type=search]{padding:8px 10px; border:1px solid var(--border); border-radius:8px; min-width:240px; font-size:14px}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th,td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap}
+  th{background:#f8fafc; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; user-select:none; position:sticky; top:0}
+  th:hover{color:var(--primary)}
+  td.num{text-align:right; font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:#f8fafc}
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600}
+  .b-day{background:#dbeafe; color:#1d4ed8} .b-night{background:#ede9fe; color:#6d28d9}
+  .empty{text-align:center; color:var(--muted); padding:30px}
+  .pager{display:flex; gap:6px; align-items:center; justify-content:flex-end; margin-top:12px; font-size:13px; color:var(--muted)}
+  .pager button{min-width:32px; padding:5px 8px; border:1px solid var(--border); background:#fff; border-radius:6px; cursor:pointer}
+  .pager button.active{background:var(--primary); color:#fff; border-color:var(--primary)}
+  .pager button:disabled{opacity:.4; cursor:default}
+  footer{text-align:center; color:var(--muted); font-size:12px; padding:20px}
+  .error{display:none; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; padding:14px 16px; border-radius:var(--radius); margin-bottom:20px}
+  @media(max-width:640px){ .grid{grid-template-columns:1fr} .wrap{padding:14px 12px} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>🚚 Dashboard Transporte · Movimiento de Relave</h1>
+  <div class="meta">
+    <span id="metaUpdate">—</span>
+    <button class="btn btn-ghost" style="margin-left:12px" onclick="cargarDatos()">Actualizar</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="error" id="errorBox"></div>
+
+  <div class="filters">
+    <div><label>Desde</label><input type="date" id="fDesde"></div>
+    <div><label>Hasta</label><input type="date" id="fHasta"></div>
+    <div><label>Turno</label><select id="fTurno"><option value="">Todos</option><option>DIA</option><option>NOCHE</option></select></div>
+    <div><label>Placa</label><select id="fPlaca"><option value="">Todas</option></select></div>
+    <div><label>Empresa</label><select id="fEmpresa"><option value="">Todas</option></select></div>
+    <div><label>Origen</label><select id="fOrigen"><option value="">Todos</option></select></div>
+    <div><label>Destino</label><select id="fDestino"><option value="">Todos</option></select></div>
+    <div style="display:flex; align-items:flex-end; gap:8px">
+      <button class="btn btn-primary" onclick="aplicarFiltros()">Filtrar</button>
+      <button class="btn btn-ghost" onclick="limpiarFiltros()">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="panel"><h2>Viajes por día <span class="hint" id="hVxDia"></span></h2><div class="chartbox"><canvas id="chDia"></canvas></div></div>
+    <div class="panel"><h2>Viajes por placa (top 10)<span class="hint"></span></h2><div class="chartbox"><canvas id="chPlaca"></canvas></div></div>
+    <div class="panel"><h2>Tonelaje por turno</h2><div class="chartbox"><canvas id="chTurnoTon"></canvas></div></div>
+    <div class="panel"><h2>Tiempo de ciclo promedio por turno (min)</h2><div class="chartbox"><canvas id="chTurnoCiclo"></canvas></div></div>
+    <div class="panel"><h2>Viajes por hora del día</h2><div class="chartbox"><canvas id="chHora"></canvas></div></div>
+    <div class="panel"><h2>Distribución de la semana</h2><div class="chartbox"><canvas id="chSemana"></canvas></div></div>
+    <div class="panel"><h2>Viajes por origen</h2><div class="chartbox"><canvas id="chOrigen"></canvas></div></div>
+    <div class="panel"><h2>Viajes por empresa</h2><div class="chartbox"><canvas id="chEmpresa"></canvas></div></div>
+  </div>
+
+  <div class="tablepanel">
+    <div class="table-head">
+      <h2>Detalle de viajes</h2>
+      <input type="search" id="qBuscar" placeholder="Buscar placa, origen, destino, turno…" oninput="aplicarFiltros(true)">
+    </div>
+    <div style="max-height:520px; overflow:auto">
+    <table id="tbl">
+      <thead id="tblHead"></thead>
+      <tbody id="tblBody"></tbody>
+    </table>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+  <footer>Datos exportados desde Excel (hoja «Toma Datos»). Publicado con GitHub Pages.</footer>
+</div>
+
+<script>
+"use strict";
+
+const CAMPOS = [
+  {k:"item",                t:"Item",                         num:true},
+  {k:"fecha",               t:"Fecha"},
+  {k:"turno",               t:"Turno",                        badge:true},
+  {k:"empresa",             t:"Empresa"},
+  {k:"placa",               t:"Placa"},
+  {k:"inicio_carguio",      t:"Ini. Carguío"},
+  {k:"fin_carguio",         t:"Fin Carguío"},
+  {k:"inicio_descarga",     t:"Ini. Descarga"},
+  {k:"fin_descarga",        t:"Fin Descarga"},
+  {k:"hora_regreso",        t:"Regreso"},
+  {k:"hora_llegada",        t:"Llegada"},
+  {k:"tonelaje",            t:"Tonelaje (t)",                 num:true, r2:true},
+  {k:"origen",              t:"Origen"},
+  {k:"destino",             t:"Destino"},
+  {k:"entre_tiempo_carguio",t:"Entre T. c.",                  num:true, min:true},
+  {k:"tiempo_carguio",      t:"T. carguío",                   num:true, min:true},
+  {k:"tiempo_descarga",     t:"T. descarga",                  num:true, min:true},
+  {k:"tiempo_ciclo",        t:"T. ciclo",                     num:true, min:true},
+  {k:"observacion",         t:"Observación"}
+];
+
+let DATA = {filas:[], generado:null, total_filas:0};
+let filtradas = [];
+let ordenadoPor = null, ordenDir = 1;
+let pagina = 1, porPagina = 25;
+
+const charts = {};
+let colores = ["#2563eb","#f59e0b","#7c3aed","#059669","#dc2626","#0ea5e9","#d946ef","#84cc16","#64748b"];
+
+function el(id){ return document.getElementById(id); }
+function num(x, dec=1){
+  if(x === null || x === undefined) return "—";
+  return Number(x).toLocaleString("es-PE", {minimumFractionDigits:0, maximumFractionDigits:dec});
+}
+function fmtFecha(x){ return x ? x : "—"; }
+function pintarFecha(fecha){
+  if(!fecha) return "—";
+  const [y,m,d] = fecha.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function crearChart(id, tipo, rotulo, medidas){
+  const ctx = el(id).getContext("2d");
+  charts[id] = new Chart(ctx, {
+    type: tipo,
+    data: {labels:[], datasets:[{label:rotulo, data:[], backgroundColor:colores, borderColor:colores, borderWidth:1.5, tension:.25, fill:false}]},
+    options: medidas
+  });
+}
+
+function fijarChart(id, labels, valores, extra){
+  const c = charts[id];
+  if(!c) return;
+  c.data.labels = labels;
+  if(valores !== undefined){
+    c.data.datasets[0].data = valores;
+    if(Array.isArray(extra)){ c.data.datasets[0].backgroundColor = extra; }
+  }
+  // datasets extra para charts de barras apiladas / lineas
+  if(Array.isArray(valores) && Array.isArray(valores[0])){
+    c.data.datasets[0].data = valores[0];
+    const conj = valores.slice(1);
+    while(c.data.datasets.length > 1) c.data.datasets.pop();
+    conj.forEach((arr,i) => {
+      c.data.datasets.push({label: (extra && extra[i]) || "serie "+(i+1), data:arr, backgroundColor:colores[(i+1)%colores.length], borderColor:colores[(i+1)%colores.length], tension:.25, fill:false, borderWidth:1.5});
+    });
+  }
+  c.update();
+}
+
+function inicializarGraficos(){
+  crearChart("chDia","line", "Viajes", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true, ticks:{precision:0}}}});
+  crearChart("chPlaca","bar", "Viajes", {responsive:true, maintainAspectRatio:false, indexAxis:"y", scales:{x:{beginAtZero:true, ticks:{precision:0}}}});
+  crearChart("chTurnoTon","bar", "Tonelaje", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true}}});
+  crearChart("chTurnoCiclo","bar", "Minutos", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true}}});
+  crearChart("chHora","bar", "Viajes", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true, ticks:{precision:0}}}});
+  crearChart("chSemana","bar", "Viajes", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true, ticks:{precision:0}}}});
+  crearChart("chOrigen","bar", "Viajes", {responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true, ticks:{precision:0}}}});
+  crearChart("chEmpresa","doughnut", "Viajes", {responsive:true, maintainAspectRatio:false});
+}
+
+function acum(arr, key){ return Object.entries(arr.reduce((a,r)=>{(a[r[key] ?? "(sin dato)"] = (a[r[key] ?? "(sin dato)"]||0)+1); return a;},{})).sort((a,b)=>b[1]-a[1]); }
+function acumProm(arr, key, valKey){
+  const m = {};
+  arr.forEach(r=>{ const k = r[key] ?? "(sin dato)"; (m[k] = m[k] || []).push(r[valKey]); });
+  return Object.entries(m).map(([k,v])=>[k, v.filter(Number.isFinite).reduce((s,x)=>s+x,0)/ (v.filter(Number.isFinite).length||1)]).sort((a,b)=>b[1]-a[1]);
+}
+function mapSuma(arr, key){ return Object.entries(arr.reduce((a,r)=>{const k=r[key]??"(sin dato)"; a[k]=(a[k]||0)+(Number(r.tonelaje)||0); return a;},{})).sort((a,b)=>b[1]-a[1]); }
+
+const normS = s => (s||"").trim().toUpperCase().replace(/[ÁÉÍÓÚÀÉÍÓÚ]+/g, m=>({"Á":"A","É":"E","Í":"I","Ó":"O","Ú":"U","À":"A","È":"E","Ì":"I","Ò":"O","Ù":"U"})[m]||m);
+
+function aplicarFiltros(desdeBusqueda){
+  const f = {
+    desde: el("fDesde").value || null,
+    hasta: el("fHasta").value || null,
+    turno: el("fTurno").value,
+    placa: el("fPlaca").value,
+    empresa: el("fEmpresa").value,
+    origen: el("fOrigen").value,
+    destino: el("fDestino").value,
+    busqueda: (el("qBuscar").value||"").trim().toLowerCase()
+  };
+
+  filtradas = DATA.filas.filter(r => {
+    if(f.desde && (r.fecha && r.fecha < f.desde)) return false;
+    if(f.hasta && (r.fecha && r.fecha > f.hasta)) return false;
+    if(f.turno && normS(r.turno) !== f.turno) return false;
+    if(f.placa && r.placa !== f.placa) return false;
+    if(f.empresa && r.empresa !== f.empresa) return false;
+    if(f.origen && r.origen !== f.origen) return false;
+    if(f.destino && r.destino !== f.destino) return false;
+    if(f.busqueda){
+      const hay = CAMPOS.some(c => String(r[c.k] ?? "").toLowerCase().includes(f.busqueda));
+      if(!hay) return false;
+    }
+    return true;
+  });
+
+  renderKpis();
+  renderGraficos();
+  pagina = 1;
+  renderTabla();
+}
+
+function renderKpis(){
+  const n = filtradas.length;
+  const ton = filtradas.reduce((s,r)=>s+(Number(r.tonelaje)||0),0);
+  const prom = (key) => { const v = filtradas.map(r=>r[key]).filter(Number.isFinite); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+  const cic = prom("tiempo_ciclo"), car = prom("tiempo_carguio"), des = prom("tiempo_descarga");
+  const hoy = new Date().toISOString().slice(0,10);
+  const hoyN = filtradas.filter(r=>r.fecha===hoy).length;
+  const clase = v => (v===null)? "" : (v<=15? "ok" : (v<=25? "med":"min"));
+  const cards = [
+    ["Viajes totales", num(n,0)+" <span style='font-size:12px;color:var(--muted)'>viajes</span>", "", "", `Rango de ${n? "fecha disponible":""}`],
+    ["Tonelaje total", num(ton,0)+" t", "", "", ton? "Toneladas registradas" : "Sin tonelaje en el rango"],
+    ["T. ciclo promedio", num(cic)+" min", clase(cic), "val "+clase(cic), cic===null? "Sin datos" : "Carguío→regreso"],
+    ["T. carguío promedio", num(car)+" min", clase(car), "val "+clase(car), car===null? "Sin datos":"Inicio→fin carguío"],
+    ["T. descarga promedio", num(des)+" min", clase(des), "val "+clase(des), des===null? "Sin datos":"Inicio→fin descarga"],
+    ["Viajes hoy", num(hoyN,0)+" <span style='font-size:12px;color:var(--muted)'>hoy</span>", "", "", hoy]
+  ];
+  el("kpis").innerHTML = cards.map(c => `
+    <div class="kpi">
+      <div class="lbl">${c[0]}</div>
+      <div class="val ${c[3]}">${c[1]}</div>
+      <div class="sub">${c[4]}</div>
+    </div>`).join("");
+}
+
+function renderGraficos(){
+  const conFecha = filtradas.filter(r=>r.fecha);
+  // viajes por dia (limitado a ultimos 45 dias si el rango es grande)
+  let porDia = Object.entries(conFecha.reduce((a,r)=>{a[r.fecha]=(a[r.fecha]||0)+1;return a;},{})).sort((a,b)=>a[0].localeCompare(b[0]));
+  if(porDia.length > 60) porDia = porDia.slice(porDia.length-60);
+  fijarChart("chDia", porDia.map(x=>pintarFecha(x[0])), porDia.map(x=>x[1]));
+  el("hVxDia").textContent = porDia.length? (`mostrando últimos ${porDia.length} días`) : "";
+
+  const porPlaca = acum(filtradas,"placa").slice(0,10).reverse();
+  fijarChart("chPlaca", porPlaca.map(x=>x[0]), porPlaca.map(x=>x[1]));
+
+  const porTurnoTon = mapSuma(filtradas,"turno");
+  fijarChart("chTurnoTon", porTurnoTon.map(x=>x[0]), porTurnoTon.map(x=>x[1]));
+
+  const porTurnoCiclo = acumProm(filtradas,"turno","tiempo_ciclo");
+  fijarChart("chTurnoCiclo", porTurnoCiclo.map(x=>x[0]), porTurnoCiclo.map(x=>Math.round(x[1])));
+
+  const horas = Array(24).fill(0);
+  filtradas.forEach(r=>{ if(r.inicio_carguio){ const h = parseInt(r.inicio_carguio.slice(0,2),10); if(h>=0&&h<24) horas[h]++; } });
+  fijarChart("chHora", Array.from({length:24},(_,i)=>`${String(i).padStart(2,"0")}:00`), horas);
+
+  const dias = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  const semana = Array(7).fill(0);
+  conFecha.forEach(r=>{ const d = new Date(r.fecha+"T12:00:00").getDay(); semana[(d+6)%7]++; });
+  fijarChart("chSemana", dias, semana);
+
+  const porOrigen = acum(filtradas,"origen").slice(0,12);
+  fijarChart("chOrigen", porOrigen.map(x=>x[0]), porOrigen.map(x=>x[1]));
+
+  const porEmp = acum(filtradas,"empresa");
+  fijarChart("chEmpresa", porEmp.map(x=>x[0]), porEmp.map(x=>x[1]));
+}
+
+function renderCabecera(){
+  let h = "<tr>";
+  CAMPOS.forEach(c => {
+    const dir = ordenadoPor===c.k ? (ordenDir>0? " ▲":" ▼") : "";
+    h += `<th data-k="${c.k}" onclick="ordenar('${c.k}')">${c.t}${dir}</th>`;
+  });
+  h += "</tr>";
+  el("tblHead").innerHTML = h;
+}
+
+function ordenar(k){
+  if(ordenadoPor===k) ordenDir *= -1; else { ordenadoPor=k; ordenDir=1; }
+  renderTabla();
+}
+
+function renderTabla(){
+  renderCabecera();
+  const filas = [...filtradas];
+  if(ordenadoPor){
+    filas.sort((a,b)=>{
+      const va=a[ordenadoPor], vb=b[ordenadoPor];
+      if(va===null&&vb===null) return 0;
+      if(va===null) return 1; if(vb===null) return -1;
+      if(typeof va==="number"&&typeof vb==="number") return (va-vb)*ordenDir;
+      return String(va).localeCompare(String(vb))*ordenDir;
+    });
+  }
+  const totalPag = Math.max(1, Math.ceil(filas.length/porPagina));
+  if(pagina>totalPag) pagina = totalPag;
+  const ini = (pagina-1)*porPagina;
+  const trozo = filas.slice(ini, ini+porPagina);
+
+  if(!trozo.length){
+    el("tblBody").innerHTML = `<tr><td colspan="${CAMPOS.length}" class="empty">No hay registros con esos filtros.</td></tr>`;
+  } else {
+    el("tblBody").innerHTML = trozo.map(r => {
+      return "<tr>" + CAMPOS.map(c => {
+        let v = r[c.k];
+        let txt = "—";
+        if(v !== null && v !== undefined){
+          if(c.num){ txt = c.min ? num(v)+"'" : (c.r2? num(v,2) : num(v,0)); }
+          else if(c.k==="turno"){ txt = `<span class="badge ${String(v).toUpperCase().trim()==="NOCHE"?"b-night":"b-day"}">${v.trim()}</span>`; }
+          else if(c.k==="fecha"){ txt = pintarFecha(v); }
+          else txt = v;
+        }
+        return `<td class="${c.num?"num":""}">${txt}</td>`;
+      }).join("") + "</tr>";
+    }).join("");
+  }
+
+  // paginador
+  let pag = "";
+  if(totalPag>1){
+    pag += `<button ${pagina===1?"disabled":""} onclick="irPag(1)">«</button>`;
+    const desde = Math.max(1, pagina-2), hasta = Math.min(totalPag, pagina+2);
+    for(let i=desde;i<=hasta;i++) pag += `<button class="${i===pagina?"active":""}" onclick="irPag(${i})">${i}</button>`;
+    pag += `<button ${pagina===totalPag?"disabled":""} onclick="irPag(${totalPag})">»</button>`;
+    pag += `<span>${filas.length} registros</span>`;
+  } else {
+    pag = `<span>${filas.length} registros</span>`;
+  }
+  el("pager").innerHTML = pag;
+}
+function irPag(p){ pagina=p; renderTabla(); el("tbl").parentElement.scrollTop = 0; }
+
+function poblarSelects(){
+  const vals = (key) => [...new Set(DATA.filas.map(r=>r[key]).filter(Boolean))].sort();
+  el("fPlaca").innerHTML = `<option value="">Todas</option>` + vals("placa").map(v=>`<option>${v}</option>`).join("");
+  el("fEmpresa").innerHTML = `<option value="">Todas</option>` + vals("empresa").map(v=>`<option>${v}</option>`).join("");
+  el("fOrigen").innerHTML = `<option value="">Todos</option>` + vals("origen").map(v=>`<option>${v}</option>`).join("");
+  el("fDestino").innerHTML = `<option value="">Todos</option>` + vals("destino").map(v=>`<option>${v}</option>`).join("");
+}
+
+function limpiarFiltros(){
+  ["fDesde","fHasta","qBuscar"].forEach(x=>el(x).value="");
+  ["fTurno","fPlaca","fEmpresa","fOrigen","fDestino"].forEach(x=>el(x).value="");
+  aplicarFiltros();
+}
+
+async function cargarDatos(){
+  const box = el("errorBox");
+  try{
+    const res = await fetch("data.json", {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    DATA = await res.json();
+    box.style.display = "none";
+    el("metaUpdate").textContent = `Última actualización: ${pintarFecha(DATA.generado? DATA.generado.slice(0,10): null)} · ${DATA.total_filas} viajes exportados`;
+    poblarSelects();
+    aplicarFiltros();
+  }catch(e){
+    box.style.display = "block";
+    box.innerHTML = `No se pudo cargar <code>data.json</code> (${e.message}). Abre el dashboard desplegado en GitHub Pages o sirve la carpeta con un servidor local (<code>python -m http.server</code>).`;
+  }
+}
+
+inicializarGraficos();
+cargarDatos();
+</script>
+</body>
+</html>
